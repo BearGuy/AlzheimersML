@@ -15,43 +15,23 @@ import org.apache.spark.mllib.regression.LabeledPoint;
 import scala.Tuple2;
 
 public class AlzheimersClassification {
-	public static void main(String[] args){
-		SparkConf conf = new SparkConf().setAppName("AlzheimersClassification");
-		JavaSparkContext jsc = new JavaSparkContext(conf);
-		
-		JavaRDD<String> csvFile =  jsc.textFile("hdfs://bi-hadoop-prod-4157.bi.services.us-south.bluemix.net:8020/tmp/data_transposed.csv");
-		final String header = csvFile.first();
-	    JavaRDD<String> csvFileWithoutHeader = csvFile.filter(new Function<String, Boolean>(){
-	    	
-	    	private static final long serialVersionUID = 1L;
-	    	
-	    	@Override
-            public Boolean call(String s) throws Exception {
-                return !s.equalsIgnoreCase(header);
-            }
-	    });
-	    
-	    JavaRDD<LabeledPoint> labeledmat = csvFileWithoutHeader.map(new Function<String, LabeledPoint>(){
-
-			private static final long serialVersionUID = 1L;
-
-			@Override
-			public LabeledPoint call(String arg0) throws Exception {
-//				System.out.println("arg0"+arg0);
-	            String[] attributes = arg0.split(",");
-	            
-	            double[] values = new double[attributes.length];
-	            for (int i = 0; i < attributes.length-1; i++) {
-	        		values[i] = Double.parseDouble(attributes[i]);
-//	        		System.out.println(values[i]);
-	            }
-	            return new LabeledPoint(Double.parseDouble(attributes[attributes.length-1]), Vectors.dense(values));  
-			}
-	    	
-	    });
+	JavaRDD<LabeledPoint> labeledMat;
+	double accuracy;
+	
+	
+	public AlzheimersClassification(JavaRDD<LabeledPoint> matLabeled){
+		this.labeledMat = matLabeled;
+		this.accuracy = calculateAccuracy(labeledMat);
+	}
+	
+	public double getAccuracy() {
+		return this.accuracy;
+	}
+	
+	public double calculateAccuracy(JavaRDD<LabeledPoint> labeledMat){
 
 	    // Split initial RDD into two... [70% training data, 30% testing data].
-	    JavaRDD<LabeledPoint>[] splits = labeledmat.randomSplit(new double[] {0.7, 0.3}, 11L);
+	    JavaRDD<LabeledPoint>[] splits = labeledMat.randomSplit(new double[] {0.7, 0.3}, 11L);
 	    JavaRDD<LabeledPoint> training = splits[0].cache();
 	    JavaRDD<LabeledPoint> test = splits[1];
 	    
@@ -65,15 +45,15 @@ public class AlzheimersClassification {
 	    MulticlassMetrics metrics = new MulticlassMetrics(predictionAndLabels.rdd());
 	    double accuracy = metrics.accuracy();
 	    System.out.println("\n\n\n\n\n\nAccuracy = " + accuracy);
+	    
+	    return accuracy;
 
 	    // Save and load model
-	    model.save(jsc.sc(), "hdfs://bi-hadoop-prod-4218.bi.services.us-south.bluemix.net:8020/tmp/Model");
-	    System.out.println("Model Saved Successfully!!!"+model.toString()); 
-	    LogisticRegressionModel sameModel = LogisticRegressionModel.load(jsc.sc(),"hdfs://bi-hadoop-prod-4218.bi.services.us-south.bluemix.net:8020/tmp/Model");
-	    System.out.println("Model Loaded Successfully!!!"+sameModel.toString()); 
+//	    model.save(jsc.sc(), "hdfs://bi-hadoop-prod-4218.bi.services.us-south.bluemix.net:8020/tmp/Model");
+//	    System.out.println("Model Saved Successfully!!!"+model.toString()); 
+//	    LogisticRegressionModel sameModel = LogisticRegressionModel.load(jsc.sc(),"hdfs://bi-hadoop-prod-4218.bi.services.us-south.bluemix.net:8020/tmp/Model");
+//	    System.out.println("Model Loaded Successfully!!!"+sameModel.toString()); 
 	    
-	    jsc.stop();
-	    jsc.close();
 	}
 
 }

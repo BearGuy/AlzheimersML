@@ -2,60 +2,40 @@ package ca.queensu;
 
 import java.util.List;
 
-import org.apache.spark.SparkConf;
-//import org.apache.spark.api.java.JavaPairRDD;
-import org.apache.spark.api.java.JavaSparkContext;
-
 
 import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.function.Function;
 import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.clustering.KMeansModel;
 import org.apache.spark.mllib.linalg.Vector;
-import org.apache.spark.mllib.linalg.Vectors;
 
+import scala.Tuple2;
 
 public class AlzheimersClustering {
-
-	public static void main(String[] args){
-		SparkConf conf = new SparkConf().setAppName("AlzheimersClustering");
-	    JavaSparkContext jsc = new JavaSparkContext(conf);
+	int numClusters;
+	int numIterations;
+	Tuple2<JavaRDD<Integer>, Vector[]> results;
+	
+	
+	public AlzheimersClustering(int clustersNum, int iterationsNum, JavaRDD<Vector> mat) {
+	    this.numClusters = clustersNum;
+	    this.numIterations = iterationsNum;
+	    this.results = dataCenters(mat, numClusters, numIterations);
+	}
+	
+	public JavaRDD<Integer> getPredictedResults(){
+		return this.results._1();
+	}
+	
+	public Vector[] getClusterCenters() {
+		return this.results._2();
+	}
 	    
-	    JavaRDD<String> csvFile = jsc.textFile("hdfs://bi-hadoop-prod-4157.bi.services.us-south.bluemix.net:8020/tmp/data_transposed.csv");
-	    final String header = csvFile.first();
-	    JavaRDD<String> csvFileWithoutHeader = csvFile.filter(new Function<String, Boolean>(){
-	    	
-	    	private static final long serialVersionUID = 1L;
-	    	
-	    	@Override
-            public Boolean call(String s) throws Exception {
-                return !s.equalsIgnoreCase(header);
-            }
-	    });
-	    JavaRDD<Vector> mat = csvFileWithoutHeader.map(new Function<String, Vector>(){
-
-			private static final long serialVersionUID = 1L;
-			
-			@Override
-			public Vector call(String arg0) throws Exception {
-	            String[] attributes = arg0.split(",");
-	            
-	            double[] values = new double[attributes.length];
-	            for (int i = 0; i < attributes.length; i++) {
-	        		values[i] = Double.parseDouble(attributes[i]);
-	            }
-	            return Vectors.dense(values);  
-			}
-	    	
-	    });
-	    mat.cache();
-	    
-	    int numClusters = 2;
-	    int numIterations = 10;
-	    KMeansModel clusters = KMeans.train(mat.rdd(), numClusters, numIterations);
-	    
-	    System.out.println("Cluster centers:");
-	    for (Vector center: clusters.clusterCenters()) {
+	public Tuple2<JavaRDD<Integer>,Vector[]> dataCenters(JavaRDD<Vector> mat, int numClusters, int numIterations) {
+		KMeansModel clusters = KMeans.train(mat.rdd(), numClusters, numIterations);
+		
+		System.out.println("Cluster centers:");
+	    Vector[] clusterCenters = clusters.clusterCenters();
+	    for (Vector center: clusterCenters) {
 	      System.out.println(" " + center.size());
 	    }
 	    
@@ -82,9 +62,8 @@ public class AlzheimersClustering {
 	    // KMeansModel sameModel = KMeansModel.load(jsc.sc(),
 	    // "target/org/apache/spark/JavaKMeansExample/KMeansModel");
 	    
-	    
-	    jsc.stop();
-	    jsc.close();
+	    Tuple2<JavaRDD<Integer>,Vector[]> results = 
+	            new Tuple2<JavaRDD<Integer>,Vector[]>(predicted_values, clusterCenters);
+	    return results;
 	}
-	
 }
